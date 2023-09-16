@@ -1,12 +1,33 @@
 import os
 from app import db, DB_FILE
+import json
+from sqlalchemy import select
 
 def create_user():
-    print("TODO: Create a user called josh")
+    from models import User
+    db.session.add(User(pennid = 0, username = "josh", year = 0, major = "CIS"))
+    db.session.commit()
+
 
 def load_data():
-    from models import *
-    print("TODO: Load in clubs.json to the database.")
+    from models import Club, Tags
+    session = db.session
+    with open("clubs.json") as f:
+        data = json.load(f)
+        for clubs in data:
+            c = Club(code = clubs["code"], name = clubs["name"], description = (clubs["description"]))
+            session.add(c)
+            for tag in clubs["tags"]:
+                tag_obj = session.execute(select(Tags).where(Tags.tag == tag)).scalar_one_or_none()
+                print(tag_obj)
+                if tag_obj is None:
+                    t = Tags(tag=tag)
+                    session.add(t)
+                    c.tags.append(t)
+                else:
+                    c.tags.append(tag_obj)
+                session.commit()
+    session.remove()
 
 
 
