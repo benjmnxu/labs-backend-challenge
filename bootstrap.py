@@ -1,16 +1,17 @@
 import os
-from app import db, DB_FILE
+from app import DB_FILE
+from extensions import db
 import json
 from sqlalchemy import select
 
 def create_user():
     from models import User
-    db.session.add(User(pennid = 0, username = "josh", year = 0, major = "CIS"))
+    db.session.add(User(pid = 0, username = "josh", year = 0, major = "CIS", password = "password"))
     db.session.commit()
 
 
 def load_data():
-    from models import Club, Tags
+    from models import Club, Tags, User
     session = db.session
     with open("clubs.json") as f:
         data = json.load(f)
