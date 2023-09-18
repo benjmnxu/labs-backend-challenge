@@ -1,21 +1,29 @@
 import random
 import string
 from flask import Flask, request, jsonify
+from sentence_transformers import SentenceTransformer, util
+# from flask_caching import Cache
 from time import gmtime, strftime
 from extensions import db
 from dotenv import load_dotenv
 import os
 import openai
+import heapq
 
 load_dotenv()
 # lol pls dont steal api key
 openai.api_key = os.getenv("OPENAI_API_KEY")
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# cache = Cache()
 
 DB_FILE = "clubreview.db"
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{DB_FILE}"
+app.config['CACHE_TYPE'] = 'SimpleCache'
 db.init_app(app)
+# cache.init_app(app)
 app.app_context().push()
 
 from models import *
@@ -53,7 +61,6 @@ def clubs():
             "comments": comments,
             "files": file_names
         }
-    print(content)
     return jsonify(content)
 
 @app.route('/api/get_user', methods = ['GET'])
@@ -128,7 +135,7 @@ def favorites():
         if current_user == None or current_user.active_account.filter_by(current_user=new_club['current_user']).first() == None:
             return jsonify({"message": "login required"})
         code = new_club["code"]
-        username = new_club["username"]
+        username = new_club["current_user"]
         person = User.query.filter_by(username=username).first()
         club = Club.query.filter_by(code=code).first()
         if club in person.clubs_favorited:
@@ -154,7 +161,6 @@ def modify_club():
         actions_message = []
         
         desc = new_information.get("description", None)
-        print(desc)
         if desc is not None:
             club.description = desc
             actions_message.append("changed description")
@@ -230,7 +236,6 @@ def modify_club():
                 actions_message.append("The following do not exist in the club: " + ",".join(errors))
 
         remove_t = new_information.get("remove_tags", None)
-        print(remove_t)
         if remove_t is not None:
             tags = []
             if type(remove_t) is not list:
@@ -238,7 +243,6 @@ def modify_club():
             else:
                 tags = remove_t
             for t in tags:
-                print(t)
                 tag = Tags.query.filter_by(tag=t).first()
                 if tag:
                     club.tags.remove(tag)
@@ -280,7 +284,6 @@ def comment():
         current_user.comments.append(c)
         db.session.commit()
     except Exception as e:
-        return e
         return jsonify({"message": repr(e)})
     return jsonify({"message": "new comment created"})
 
@@ -322,7 +325,7 @@ def signup():
     try:
         username = user_input['username']
         if User.query.filter(User.username==username).first():
-            return
+            return jsonify({"message": "username already in use. please pick a different one"})
         password = user_input['password']
         pid = user_input['pid']
         year = user_input['year']
@@ -392,5 +395,40 @@ def upload():
 
     return jsonify({"message": f"Uploaded: {file.filename}"})
     
+@app.route("/api/similar_clubs", methods=['GET'])
+def find_similar():
+    info = request.get_json()
+    try:
+        current_user = User.query.filter_by(username=info["current_user"]).first()
+        if current_user == None or current_user.active_account.filter_by(current_user=info['current_user']).first() == None:
+            return jsonify({"message": "login required"})
+        code = info['code']
+        number = info.get("num", 3)
+        description = Club.query.filter_by(code=code).first().description
+        clubs = Club.query.all()
+        min_max_similarity = -1
+        heap = []
+        embeddings1 = model.encode(description, convert_to_tensor=True)
+        for club in clubs:
+            embeddings2 = model.encode(club.description, convert_to_tensor=True)
+            similarity = util.cos_sim(embeddings1, embeddings2)
+            # similarity = algs.jaro_winkler.normalized_similarity(description, club.description)
+            if similarity > min_max_similarity and club.code != code:
+                if len(heap) == number:
+                    heapq.heappushpop(heap, (similarity, club))
+                else:
+                    heapq.heappush(heap, (similarity, club))
+                print(heap)
+                min_max_similarity = heap[0][0]
+                print(min_max_similarity)
+        
+        most_similar_club = []
+        heap.reverse()
+        for elim in heap:
+            most_similar_club.append(elim[1].name)
+        return jsonify({"message": most_similar_club})
+    except Exception as e:
+        return jsonify({"message": e})
+
 if __name__ == '__main__':
     app.run()

@@ -45,8 +45,8 @@ class User(db.Model):
     major: Mapped[str] = mapped_column(String)
     password: Mapped[str] = mapped_column(String)
 
-    def get_col_spec(self, **kw):
-        return self
+    def __lt__(self, other):
+        return other
 
 class Tags(db.Model):
     __tablename__ = "Tags"
@@ -75,21 +75,12 @@ class Club(db.Model):
 
 class ActiveUser(db.Model):
     __tablename__ = "ActiveUsers"
-    current_user: Mapped[str] = mapped_column(String, primary_key = True)
-    login_time: Mapped[str] = mapped_column(String, default=0)
+    current_user: Mapped[str] = mapped_column(String)
+    login_time: Mapped[str] = mapped_column(String, default=0, primary_key = True)
     logout_time: Mapped[str] = mapped_column(String, default=0)
     user_account = relationship(
         "User", secondary=active_users, backref=db.backref("active_account", lazy = 'dynamic')
     )
-
-
-class Node(db.Model):
-    __tablename__ = "node"
-    id = mapped_column(Integer, primary_key=True)
-    parent_id = mapped_column(Integer, ForeignKey("node.id"))
-    data = mapped_column(String(50))
-    children = relationship("Node", back_populates="parent")
-    parent = relationship("Node", back_populates="children", remote_side=[id])
 
 class Comment(db.Model):
     __tablename__ = 'Comments'

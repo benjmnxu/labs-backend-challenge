@@ -9,7 +9,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 from app import DB_FILE, app
 from extensions import db
-from models import Club, Tags, User
+from models import Club, Tags, User, ActiveUser, Comment, File
 
 db.create_all()
 
