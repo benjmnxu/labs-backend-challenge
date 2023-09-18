@@ -428,7 +428,7 @@ def find_similar():
             most_similar_club.append(elim[1].name)
         return jsonify({"message": most_similar_club})
     except Exception as e:
-        return jsonify({"message": e})
+        return jsonify({"message": repr(e)})
 
 if __name__ == '__main__':
     app.run()
